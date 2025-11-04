@@ -20,7 +20,7 @@ A semantic HTTP client written in Go that replaces traditional curl syntax with 
 req read https://api.example.com/users as=json
 
 # Send JSON data
-req send https://api.example.com/users with=json:'{"name":"Ada"}'
+req send https://api.example.com/users with=json:'{"name":"Adam"}'
 
 # Save a file
 req save https://example.com/file.zip to=file.zip
