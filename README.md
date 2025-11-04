@@ -34,6 +34,8 @@ go install github.com/adammpkins/req/cmd/req@latest
 
 Or download a pre-built binary from the [Releases](https://github.com/adammpkins/req/releases) page.
 
+**Latest release:** [v0.2.1](https://github.com/adammpkins/req/releases/tag/v0.2.1) - Enhanced TUI with JSON formatting and scrolling
+
 ## Grammar
 
 The `req` command follows this grammar:
@@ -132,13 +134,21 @@ req
 The TUI mode provides:
 - Interactive command builder with form-based input
 - **Syntax-highlighted JSON output** with color-coded keys, values, and punctuation
-- **Scrollable viewport** for long responses (use ↑/↓, pgup/pgdown, home/end)
+- **Scrollable viewport** for long responses with keyboard navigation
 - Pretty-printed JSON with automatic indentation
 - Real-time command execution and response display
 
+**Keyboard Controls:**
+- `↑` / `↓` or `k` / `j` - Scroll line by line
+- `pgup` / `pgdown` - Page scrolling
+- `home` - Jump to top
+- `end` - Jump to bottom
+- `ctrl+u` / `ctrl+d` - Half-page scrolling
+- `esc` - Quit TUI
+
 ## Current Status
 
-**v0.2.1** - Enhanced TUI with JSON formatting and scrolling
+**v0.2.1** - Enhanced TUI with JSON formatting and scrolling ([Release Notes](https://github.com/adammpkins/req/releases/tag/v0.2.1))
 
 - ✅ Command parsing with grammar validation
 - ✅ Execution plan generation
