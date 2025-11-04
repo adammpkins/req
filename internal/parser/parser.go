@@ -97,8 +97,11 @@ func (p *Parser) tokenize(input string) {
 
 	for i, part := range parts {
 		pos := i
-		// Handle clauses with equals
-		if strings.Contains(part, "=") {
+		// Check if this is a URL first (URLs with query params contain = but are not clauses)
+		if looksLikeURL(part) {
+			tokens = append(tokens, token{typ: tokenURL, value: part, pos: pos})
+		} else if strings.Contains(part, "=") {
+			// Handle clauses with equals
 			// Split on = but keep the = as a token
 			eqIdx := strings.Index(part, "=")
 			key := part[:eqIdx]
@@ -121,8 +124,6 @@ func (p *Parser) tokenize(input string) {
 			} else {
 				tokens = append(tokens, token{typ: tokenString, value: value, pos: pos})
 			}
-		} else if looksLikeURL(part) {
-			tokens = append(tokens, token{typ: tokenURL, value: part, pos: pos})
 		} else if isFlag(part) {
 			tokens = append(tokens, token{typ: tokenFlag, value: part, pos: pos})
 		} else {

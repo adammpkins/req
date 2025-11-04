@@ -119,9 +119,26 @@ req read https://api.example.com/users retry=3 timeout=10s as=json
 req read https://api.example.com/users as=json --dry-run
 ```
 
+### Interactive TUI Mode
+
+```bash
+# Launch interactive TUI mode
+req --tui
+
+# Or run without arguments to launch TUI
+req
+```
+
+The TUI mode provides:
+- Interactive command builder with form-based input
+- **Syntax-highlighted JSON output** with color-coded keys, values, and punctuation
+- **Scrollable viewport** for long responses (use ↑/↓, pgup/pgdown, home/end)
+- Pretty-printed JSON with automatic indentation
+- Real-time command execution and response display
+
 ## Current Status
 
-**v0.2.0** - HTTP execution and file downloads
+**v0.2.1** - Enhanced TUI with JSON formatting and scrolling
 
 - ✅ Command parsing with grammar validation
 - ✅ Execution plan generation
@@ -130,10 +147,14 @@ req read https://api.example.com/users as=json --dry-run
 - ✅ Directory path handling for `to=` clause
 - ✅ Dry-run mode that prints JSON plans
 - ✅ Helpful error messages with suggestions
+- ✅ **Interactive TUI mode with syntax-highlighted JSON output**
+- ✅ **Scrollable viewport for long responses**
+- ✅ **Pretty-printed JSON with automatic formatting**
 
 ## Roadmap
 
-- **v0.2.0** ✅ - HTTP execution and file downloads (current)
+- **v0.2.0** ✅ - HTTP execution and file downloads
+- **v0.2.1** ✅ - Enhanced TUI with JSON formatting and scrolling (current)
 - **v0.3.0** - Send with json and form, upload with multipart
 - **v0.4.0** - Watch SSE and polling with until
 - **v0.5.0** - Pick on JSON responses
