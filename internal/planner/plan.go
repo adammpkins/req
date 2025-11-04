@@ -4,6 +4,10 @@ package planner
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/adammpkins/req/internal/types"
@@ -69,6 +73,27 @@ func Plan(cmd *types.Command) (*ExecutionPlan, error) {
 	for _, clause := range cmd.Clauses {
 		if err := applyClause(clause, plan); err != nil {
 			return nil, err
+		}
+	}
+
+	// Post-process: extract filename for save verb if destination not provided or is a directory
+	if cmd.Verb == types.VerbSave && plan.Output != nil {
+		if plan.Output.Destination == "" {
+			// No destination provided, extract from URL
+			filename := extractFilenameFromURL(plan.URL)
+			if filename != "" {
+				plan.Output.Destination = filename
+			}
+		} else {
+			// Destination provided - check if it's a directory
+			if isDirectory(plan.Output.Destination) {
+				// It's a directory, append filename from URL
+				filename := extractFilenameFromURL(plan.URL)
+				if filename != "" {
+					plan.Output.Destination = filepath.Join(plan.Output.Destination, filename)
+				}
+			}
+			// If it's a file path (like /tmp/file.zip), use it as-is
 		}
 	}
 
@@ -191,5 +216,61 @@ func validatePlan(plan *ExecutionPlan) error {
 	// Validate that save has a destination
 	// This will be expanded as we add more validation rules
 	return nil
+}
+
+// extractFilenameFromURL extracts a filename from a URL.
+func extractFilenameFromURL(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return ""
+	}
+
+	// Get the path
+	path := u.Path
+	if path == "" || path == "/" {
+		// Try to get from query or fragment
+		return "download"
+	}
+
+	// Remove leading slash
+	path = strings.TrimPrefix(path, "/")
+
+	// Get the last segment
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return "download"
+	}
+
+	filename := parts[len(parts)-1]
+
+	// URL decode the filename (handle both path and query encoding)
+	filename, err = url.PathUnescape(filename)
+	if err != nil {
+		// If PathUnescape fails, try QueryUnescape
+		filename, err = url.QueryUnescape(filename)
+		if err != nil {
+			// If decoding fails, use the original
+			filename = parts[len(parts)-1]
+		}
+	}
+
+	// If filename is empty or doesn't have an extension, use a default
+	if filename == "" || !strings.Contains(filename, ".") {
+		filename = "download"
+	}
+
+	// Clean the filename (remove any path separators)
+	filename = filepath.Base(filename)
+
+	return filename
+}
+
+// isDirectory checks if a path is a directory.
+func isDirectory(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
 }
 

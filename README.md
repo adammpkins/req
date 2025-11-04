@@ -91,7 +91,14 @@ req send https://api.example.com/users with=json:'{"name":"Ada","email":"ada@exa
 ### Save a File
 
 ```bash
+# Save with explicit filename
 req save https://example.com/file.zip to=file.zip
+
+# Save with auto-detected filename (extracts from URL)
+req save https://example.com/file.zip
+
+# Save to directory path
+req save https://example.com/file.zip to=/tmp/file.zip
 ```
 
 ### With Headers
@@ -114,16 +121,19 @@ req read https://api.example.com/users as=json --dry-run
 
 ## Current Status
 
-**v0.1.0** - Parser and planner with dry-run output
+**v0.2.0** - HTTP execution and file downloads
 
 - ✅ Command parsing with grammar validation
 - ✅ Execution plan generation
+- ✅ HTTP request execution (GET, POST, etc.)
+- ✅ File downloads with automatic filename extraction
+- ✅ Directory path handling for `to=` clause
 - ✅ Dry-run mode that prints JSON plans
 - ✅ Helpful error messages with suggestions
 
 ## Roadmap
 
-- **v0.2.0** - Read and save with headers, params, as, to, timeout, retry
+- **v0.2.0** ✅ - HTTP execution and file downloads (current)
 - **v0.3.0** - Send with json and form, upload with multipart
 - **v0.4.0** - Watch SSE and polling with until
 - **v0.5.0** - Pick on JSON responses
