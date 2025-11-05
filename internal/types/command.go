@@ -72,12 +72,12 @@ type ToClause struct {
 
 func (ToClause) clause() {}
 
-// MethodClause represents a "method=" clause.
-type MethodClause struct {
-	Method string // GET, POST, PUT, DELETE, etc.
+// UsingClause represents a "using=" clause for HTTP method override.
+type UsingClause struct {
+	Method string // GET, POST, PUT, PATCH, DELETE, etc.
 }
 
-func (MethodClause) clause() {}
+func (UsingClause) clause() {}
 
 // RetryClause represents a "retry=" clause.
 type RetryClause struct {

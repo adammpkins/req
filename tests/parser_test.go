@@ -106,6 +106,52 @@ func TestParseBasicRead(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:  "send with using=PUT",
+			input: "send https://api.example.com/users using=PUT",
+			want: &types.Command{
+				Verb:   types.VerbSend,
+				Target: types.Target{URL: "https://api.example.com/users"},
+				Clauses: []types.Clause{
+					types.UsingClause{Method: "PUT"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "send with using=patch (normalize to uppercase)",
+			input: "send https://api.example.com/users using=patch",
+			want: &types.Command{
+				Verb:   types.VerbSend,
+				Target: types.Target{URL: "https://api.example.com/users"},
+				Clauses: []types.Clause{
+					types.UsingClause{Method: "PATCH"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "read with using=HEAD",
+			input: "read https://api.example.com/users using=HEAD",
+			want: &types.Command{
+				Verb:   types.VerbRead,
+				Target: types.Target{URL: "https://api.example.com/users"},
+				Clauses: []types.Clause{
+					types.UsingClause{Method: "HEAD"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "using= with invalid method",
+			input:   "read https://api.example.com/users using=INVALID",
+			wantErr: true,
+		},
+		{
+			name:    "old method= syntax should error",
+			input:   "read https://api.example.com/users method=PUT",
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -126,6 +172,21 @@ func TestParseBasicRead(t *testing.T) {
 			}
 			if len(got.Clauses) != len(tt.want.Clauses) {
 				t.Errorf("Parse() Clauses length = %v, want %v", len(got.Clauses), len(tt.want.Clauses))
+				return
+			}
+			// Check UsingClause if present
+			for i, clause := range got.Clauses {
+				if usingClause, ok := clause.(types.UsingClause); ok {
+					if i >= len(tt.want.Clauses) {
+						t.Errorf("Parse() UsingClause found but not expected")
+						continue
+					}
+					if wantUsingClause, ok := tt.want.Clauses[i].(types.UsingClause); ok {
+						if usingClause.Method != wantUsingClause.Method {
+							t.Errorf("Parse() UsingClause.Method = %v, want %v", usingClause.Method, wantUsingClause.Method)
+						}
+					}
+				}
 			}
 		})
 	}

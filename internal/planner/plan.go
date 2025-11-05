@@ -71,7 +71,7 @@ func Plan(cmd *types.Command) (*ExecutionPlan, error) {
 
 	// Process clauses
 	for _, clause := range cmd.Clauses {
-		if err := applyClause(clause, plan); err != nil {
+		if err := applyClause(clause, plan, cmd.Verb); err != nil {
 			return nil, err
 		}
 	}
@@ -133,11 +133,42 @@ func applyVerbDefaults(verb types.Verb, plan *ExecutionPlan) error {
 	return nil
 }
 
+// validateUsingClause validates that the HTTP method is compatible with the verb.
+func validateUsingClause(verb types.Verb, method string) error {
+	allowedMethods := map[types.Verb][]string{
+		types.VerbRead:    {"GET", "HEAD", "OPTIONS"},
+		types.VerbSave:    {"GET", "POST"},
+		types.VerbSend:   {"POST", "PUT", "PATCH"},
+		types.VerbUpload: {"POST", "PUT"},
+		types.VerbWatch:  {"GET"},
+		types.VerbInspect: {"HEAD", "GET", "OPTIONS"},
+	}
+	
+	allowed, ok := allowedMethods[verb]
+	if !ok {
+		// If verb not in map, allow any method (for future verbs like delete)
+		return nil
+	}
+	
+	for _, allowedMethod := range allowed {
+		if method == allowedMethod {
+			return nil
+		}
+	}
+	
+	return fmt.Errorf("verb '%s' is incompatible with method '%s'", verb, method)
+}
+
 // applyClause applies a clause to the execution plan.
-func applyClause(clause types.Clause, plan *ExecutionPlan) error {
+func applyClause(clause types.Clause, plan *ExecutionPlan, verb types.Verb) error {
 	switch c := clause.(type) {
-	case types.MethodClause:
-		plan.Method = c.Method
+	case types.UsingClause:
+		// Validate compatibility before applying
+		if err := validateUsingClause(verb, c.Method); err != nil {
+			return err
+		}
+		// Normalize to uppercase (defensive, should already be normalized in parser)
+		plan.Method = strings.ToUpper(c.Method)
 	case types.HeadersClause:
 		for k, v := range c.Headers {
 			plan.Headers[k] = v

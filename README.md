@@ -63,7 +63,7 @@ req <verb> <target> [clauses...]
 - `params=<object>` - Query parameters
 - `as=<format>` - Output format (json, csv, text, raw)
 - `to=<path>` - Destination file or directory
-- `method=<method>` - HTTP method override
+- `using=<method>` - HTTP method override (e.g., `using=PUT`, `using=PATCH`)
 - `retry=<count>` - Retry count
 - `backoff=<min>..<max>` - Backoff range (e.g., `backoff=200ms..5s`)
 - `timeout=<duration>` - Request timeout

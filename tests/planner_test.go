@@ -2,6 +2,7 @@ package tests
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -139,12 +140,12 @@ func TestPlanWithRetry(t *testing.T) {
 	}
 }
 
-func TestPlanWithMethodOverride(t *testing.T) {
+func TestPlanWithUsingOverride(t *testing.T) {
 	cmd := &types.Command{
-		Verb:   types.VerbRead,
+		Verb:   types.VerbSend,
 		Target: types.Target{URL: "https://api.example.com/users"},
 		Clauses: []types.Clause{
-			types.MethodClause{Method: http.MethodDelete},
+			types.UsingClause{Method: "PUT"},
 		},
 	}
 
@@ -154,8 +155,52 @@ func TestPlanWithMethodOverride(t *testing.T) {
 	}
 
 	// Method override should take precedence
-	if plan.Method != http.MethodDelete {
-		t.Errorf("Plan() Method = %v, want %v", plan.Method, http.MethodDelete)
+	if plan.Method != "PUT" {
+		t.Errorf("Plan() Method = %v, want PUT", plan.Method)
+	}
+}
+
+func TestPlanWithUsingIncompatible(t *testing.T) {
+	cmd := &types.Command{
+		Verb:   types.VerbRead,
+		Target: types.Target{URL: "https://api.example.com/users"},
+		Clauses: []types.Clause{
+			types.UsingClause{Method: "POST"},
+		},
+	}
+
+	plan, err := planner.Plan(cmd)
+	if err == nil {
+		t.Fatalf("Plan() expected error for incompatible verb-method combination")
+	}
+
+	// Should have error message
+	if plan != nil {
+		t.Errorf("Plan() should return nil on error")
+	}
+	
+	// Check error message
+	if !strings.Contains(err.Error(), "incompatible") {
+		t.Errorf("Plan() error message should mention incompatibility, got: %v", err)
+	}
+}
+
+func TestPlanWithUsingDeleteForSend(t *testing.T) {
+	cmd := &types.Command{
+		Verb:   types.VerbSend,
+		Target: types.Target{URL: "https://api.example.com/users"},
+		Clauses: []types.Clause{
+			types.UsingClause{Method: "DELETE"},
+		},
+	}
+
+	plan, err := planner.Plan(cmd)
+	if err == nil {
+		t.Fatalf("Plan() expected error for incompatible verb-method combination")
+	}
+
+	if plan != nil {
+		t.Errorf("Plan() should return nil on error")
 	}
 }
 

@@ -7,14 +7,14 @@
 //	target = url
 //	clauses = clause { clause }
 //	clause = with_clause | headers_clause | params_clause | as_clause | to_clause |
-//	         method_clause | retry_clause | backoff_clause | timeout_clause | proxy_clause |
+//	         using_clause | retry_clause | backoff_clause | timeout_clause | proxy_clause |
 //	         pick_clause | every_clause | until_clause | field_clause | flag_clause
 //	with_clause = "with=" ( "json:" string | "form:" string | string )
 //	headers_clause = "headers=" object
 //	params_clause = "params=" object
 //	as_clause = "as=" ( "json" | "csv" | "text" | "raw" )
 //	to_clause = "to=" path
-//	method_clause = "method=" ( "GET" | "POST" | "PUT" | "DELETE" | ... )
+//	using_clause = "using=" ( "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" )
 //	retry_clause = "retry=" number
 //	backoff_clause = "backoff=" duration ".." duration
 //	timeout_clause = "timeout=" duration
@@ -33,6 +33,18 @@ import (
 
 	"github.com/adammpkins/req/internal/types"
 )
+
+// isValidHTTPMethod checks if a method is a valid HTTP method.
+func isValidHTTPMethod(method string) bool {
+	validMethods := []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+	methodUpper := strings.ToUpper(method)
+	for _, valid := range validMethods {
+		if methodUpper == valid {
+			return true
+		}
+	}
+	return false
+}
 
 // ParseError represents a parse error with position information.
 type ParseError struct {
@@ -340,8 +352,8 @@ func (p *Parser) parseClause() (types.Clause, error) {
 			return p.parseAsClause()
 		case "to":
 			return p.parseToClause()
-		case "method":
-			return p.parseMethodClause()
+		case "using":
+			return p.parseUsingClause()
 		case "retry":
 			return p.parseRetryClause()
 		case "backoff":
@@ -369,7 +381,7 @@ func (p *Parser) parseClause() (types.Clause, error) {
 
 // suggestClause suggests a similar clause name.
 func suggestClause(input string) string {
-	clauses := []string{"with", "headers", "params", "as", "to", "method", "retry", "backoff", "timeout", "proxy", "pick", "every", "until", "field"}
+	clauses := []string{"with", "headers", "params", "as", "to", "using", "retry", "backoff", "timeout", "proxy", "pick", "every", "until", "field"}
 	best := ""
 	minDist := 999
 	for _, c := range clauses {
@@ -445,15 +457,25 @@ func (p *Parser) parseToClause() (types.Clause, error) {
 	return types.ToClause{Destination: tok.value}, nil
 }
 
-// parseMethodClause parses a "method=" clause.
-func (p *Parser) parseMethodClause() (types.Clause, error) {
+// parseUsingClause parses a "using=" clause.
+func (p *Parser) parseUsingClause() (types.Clause, error) {
 	if p.pos >= len(p.tokens) {
 		return nil, &ParseError{Position: p.pos, Token: "", Message: "expected HTTP method"}
 	}
 
 	tok := p.tokens[p.pos]
 	p.pos++
-	return types.MethodClause{Method: tok.value}, nil
+	method := strings.ToUpper(tok.value)
+	
+	if !isValidHTTPMethod(method) {
+		return nil, &ParseError{
+			Position: tok.pos,
+			Token:    tok.value,
+			Message:  fmt.Sprintf("invalid HTTP method: %s (valid methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)", tok.value),
+		}
+	}
+	
+	return types.UsingClause{Method: method}, nil
 }
 
 // parseRetryClause parses a "retry=" clause.
