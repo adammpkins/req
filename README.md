@@ -63,7 +63,7 @@ req <verb> <target> [clauses...]
 - `params=<object>` - Query parameters
 - `as=<format>` - Output format (json, csv, text, raw)
 - `to=<path>` - Destination file or directory
-- `using=<method>` - HTTP method override (e.g., `using=PUT`, `using=PATCH`)
+- `using=<method>` - HTTP method override (e.g., `using=PUT`, `using=PATCH`). Validates that the method is compatible with the verb. Valid methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS.
 - `retry=<count>` - Retry count
 - `backoff=<min>..<max>` - Backoff range (e.g., `backoff=200ms..5s`)
 - `timeout=<duration>` - Request timeout
@@ -115,6 +115,21 @@ req read https://api.example.com/users headers='{"Authorization":"Bearer token"}
 req read https://api.example.com/users retry=3 timeout=10s as=json
 ```
 
+### Method Override
+
+```bash
+# Use PUT instead of POST
+req send https://api.example.com/users/1 using=PUT with=json:'{"name":"Updated"}'
+
+# Use PATCH for partial updates
+req send https://api.example.com/users/1 using=PATCH with=json:'{"email":"new@example.com"}'
+
+# Use HEAD to check headers without body
+req read https://api.example.com/users using=HEAD
+```
+
+**Note:** The `using=` clause validates method-verb compatibility. For example, `read using=POST` will fail as `read` only allows GET, HEAD, or OPTIONS.
+
 ### Dry Run
 
 ```bash
@@ -160,6 +175,7 @@ The TUI mode provides:
 - ✅ **Interactive TUI mode with syntax-highlighted JSON output**
 - ✅ **Scrollable viewport for long responses**
 - ✅ **Pretty-printed JSON with automatic formatting**
+- ✅ **HTTP method override with `using=` clause and verb-method validation**
 
 ## Roadmap
 
