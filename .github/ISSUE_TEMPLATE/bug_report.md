@@ -32,7 +32,7 @@ req <your-command-here>
 - OS: [e.g., Linux, macOS, Windows]
 - Architecture: [e.g., amd64, arm64]
 - Version: [e.g., v0.1.0]
-- Go version: [e.g., 1.23]
+- Go version: [e.g., 1.24]
 
 ## Additional Context
 

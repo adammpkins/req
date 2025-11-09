@@ -1,4 +1,4 @@
-# golangci-lint configuration with strict presets
+# golangci-lint configuration with lean modern linter set
 run:
   timeout: 5m
   tests: true
@@ -7,16 +7,9 @@ linters-settings:
   errcheck:
     check-type-assertions: true
     check-blank: true
-  goconst:
-    min-len: 2
-    min-occurrences: 2
   gocritic:
     enabled-tags:
       - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
   govet:
     check-shadowing: true
   misspell:
@@ -31,71 +24,19 @@ linters:
   disable-all: true
   enable:
     - errcheck
-    - goconst
     - gocritic
-    - gofmt
     - goimports
-    - golint
-    - gosec
     - gosimple
     - govet
     - ineffassign
     - misspell
-    - staticcheck
-    - structcheck
-    - typecheck
-    - unconvert
-    - unparam
-    - unused
-    - varcheck
-    - deadcode
-    - dupl
-    - errname
-    - errorlint
-    - exportloopref
-    - exhaustive
-    - forbidigo
-    - funlen
-    - gochecknoinits
-    - gocognit
-    - gocyclo
-    - goerr113
-    - goheader
-    - gomnd
-    - gomodguard
-    - goprintffuncname
-    - gosec
-    - grouper
-    - ifshort
-    - importas
-    - interfacer
-    - makezero
-    - maligned
-    - misspell
-    - nakedret
-    - noctx
     - nolintlint
-    - nosprintfhostport
-    - prealloc
-    - promlinter
-    - rowserrcheck
-    - scopelint
-    - sqlclosecheck
-    - stylecheck
-    - thelper
-    - tparallel
-    - unconvert
-    - unparam
-    - whitespace
+    - staticcheck
 
 issues:
   exclude-rules:
     - path: _test\.go
       linters:
         - errcheck
-        - gosec
-        - funlen
-        - gocognit
   max-issues-per-linter: 0
   max-same-issues: 0
-

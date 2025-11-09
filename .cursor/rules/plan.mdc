@@ -1,0 +1,249 @@
+---
+alwaysApply: true
+---
+# /.cursor/plan.md
+
+# req project plan - v0.1 to 90 percent curl coverage
+
+This is a strict, test-driven plan. Each task has acceptance criteria. No code here. Use these goals as Cursor prompts.
+
+## 1) Lock the surface grammar
+- Enforce command shape: `req <verb> <url> [clauses...]`
+- Allowed verbs: read, save, send, upload, watch, inspect, authenticate, session (show|clear|use)
+- Allowed clauses: using=, include=, with=, expect=, as=, to=, retry=, under=, via=, attach=, follow=smart, insecure=true
+- Clause order independent
+
+Acceptance
+- Unknown clause keys hard error with nearest suggestion
+- Duplicate singletons hard error with fix hint
+- Golden tests for valid and invalid examples
+- `req help` prints the grammar summary
+
+## 2) include= value grammar
+Goal
+- Implement semicolon separated items with explicit tags
+
+Do
+- Items: `header: Name: Value`, `param: key=value`, `cookie: key=value`
+- Values may be quoted
+- Multiple include= clauses allowed
+
+Merging rules
+- Headers: keep all for multi valued headers, else last wins
+- Params: repeated keys become repeated pairs in order
+- Cookies: last value wins
+
+Acceptance
+- Unit tests for quoting, embedded semicolons, repeated keys, error cases
+- Golden tests for combined include payloads
+
+## 3) attach= multipart grammar
+Goal
+- Repeatable clause for multipart form data
+
+Do
+- Items: `part: ...` and `boundary: ...`
+- Part kvs: `name=`, one of `file=@path` or `value=`, optional `filename=`, optional `type=media/type`
+- Validate name required, exactly one of file or value
+- Any attach= forces `Content-Type: multipart/form-data; boundary=...`
+- If user set Content-Type manually, override and print a one line note
+
+Acceptance
+- Unit tests for file, text, mixed parts, explicit boundary, malformed descriptors
+- Integration test uses echo server to assert parts
+
+## 4) follow=smart and insecure=true
+Goal
+- Add redirect and TLS toggles
+
+Do
+- follow accepts only `smart`
+- insecure accepts `true` or `false`
+
+Acceptance
+- Unit tests parse both correctly and reject bad values
+
+## 5) with= body modes and light inference
+Goal
+- Support inline, @file, @-
+
+Do
+- If Content-Type is not set and inline begins with `{` or `[`, infer `application/json` and log a one line note on stderr
+- Explicit header always overrides inference
+
+Acceptance
+- Tests for inference, override, and no inference on file
+
+## 6) expect= assertions
+Goal
+- Single clause with comma separated checks
+
+Checks
+- `status:200`
+- `header:Content-Type=application/json`
+- `contains:"text"`
+- `jsonpath:"$.items[0].id"`
+- `matches:"^OK\\b"`
+
+Acceptance
+- Exit 3 on any failure, with a concise diff-like message
+- Tests for pass and fail cases
+
+## 7) Verb defaults and method validation
+Goal
+- Map verbs to default methods and validate using=
+
+Defaults
+- read GET
+- save GET
+- send GET by default, POST if with= present
+- upload POST if attach= or with= present, else error
+- watch GET
+- inspect HEAD
+- authenticate default POST if with= present
+
+Acceptance
+- Tests for defaults and invalid combinations
+
+## 8) Redirect policy
+Goal
+- Implement safe redirect rules
+
+Rules
+- read and save follow up to 5 by default
+- write verbs do not follow by default
+- follow=smart follows only 307 and 308 for writes, up to 5
+- On 301, 302, 303 for writes, do not follow, print advisory
+
+Acceptance
+- Integration tests for 301, 302, 303, 307, 308 with and without smart
+- Stderr shows compact trace
+
+## 9) Transparent compression
+Goal
+- gzip and br on by default
+
+Do
+- Inject Accept-Encoding unless user set it
+- Auto decompress before as= and expect=
+- One line stderr note when decompressed
+
+Acceptance
+- gz and br tests, expect sees decoded text, user header respected
+
+## 10) TLS control
+Goal
+- Implement insecure=true
+
+Acceptance
+- Self signed server fails normally, succeeds with insecure=true
+- One line stderr warning: TLS verification disabled
+
+## 11) Query param merging and URL assembly
+Goal
+- Merge URL params with include param items
+
+Acceptance
+- Repeated keys serialize in insertion order
+- Proper percent encoding
+- Existing URL params preserved and merged
+
+## 12) Output control with as= and to=
+Goal
+- Finalize sinks and formatting
+
+Do
+- as=json, text, raw, csv
+- to=PATH writes file. For save, derive filename from URL if needed
+- stdout is body, stderr is compact meta with redaction
+
+Acceptance
+- Filename extraction, directory handling, percent decoding, meta block content
+
+## 13) Sessions and authenticate
+Goal
+- Explicit session model
+
+Do
+- authenticate captures Set-Cookie and `access_token` from JSON
+- Store per host in user state dir with strict perms
+- Auto apply for matching host unless caller includes Authorization or Cookie
+- Print `Using session for <host>` on use
+- session show, session clear, session use implemented
+
+Acceptance
+- Integration tests for login, reuse, override, redaction, permission refusal
+
+## 14) Multipart body construction
+Goal
+- Build body with generated boundary and proper part headers
+
+Acceptance
+- Echo server validates Content-Disposition, Content-Type, filenames and order
+- Manual Content-Type overridden with a note
+
+## 15) Errors, hints, exit codes
+Goal
+- Clear, specific failures
+
+Acceptance
+- Exit codes: 0 ok, 3 expect fail, 4 network, 5 grammar
+- Hints for unquoted semicolons, missing equals, duplicate singletons, unknown clause, bad attach part
+
+## 16) Help and explain
+Goal
+- Discoverability tools
+
+Do
+- `req help` prints grammar table and examples
+- `req explain "<command>"` prints parsed plan without executing
+
+Acceptance
+- Golden tests for explain output
+
+## 17) Cross shell quoting doc
+Goal
+- Portability guidance
+
+Do
+- Quoting cheat sheet for bash, zsh, fish, PowerShell
+- Curl vs req mapping table for common tasks
+
+Acceptance
+- Docs included and examples parse in a simple parser smoke test
+
+## 18) CI, golden, fixtures
+Goal
+- Stable test harness
+
+Do
+- Golden tests for parser and explain
+- Local HTTP fixture: echo headers, cookies, query, gzip, br, 30x, multipart
+- Run under race detector
+
+Acceptance
+- CI green across Go versions you support
+
+## 19) Streaming and watch polish
+Goal
+- Memory efficient downloads and sensible watch output
+
+Do
+- Stream to file for save
+- Watch prints timestamps on TTY, raw otherwise
+
+Acceptance
+- Large download uses low memory
+- Watch behaves per TTY detection
+
+## 20) README refresh
+Goal
+- Align docs with grammar
+
+Do
+- Replace stale examples with include, attach, expect forms
+- Document redirect defaults and smart policy
+- Add warning about insecure=true and shell history
+
+Acceptance
+- Doc snippets pass as golden examples

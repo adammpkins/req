@@ -50,7 +50,7 @@ func TestParseBasicRead(t *testing.T) {
 		},
 		{
 			name:  "send with json body",
-			input: "send https://api.example.com/users with=json:'{\"name\":\"Ada\"}'",
+			input: "send https://api.example.com/users with='{\"name\":\"Ada\"}'",
 			want: &types.Command{
 				Verb:   types.VerbSend,
 				Target: types.Target{URL: "https://api.example.com/users"},
@@ -83,25 +83,25 @@ func TestParseBasicRead(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:  "read with insecure flag",
-			input: "read https://api.example.com/users insecure",
+			name:  "read with insecure clause",
+			input: "read https://api.example.com/users insecure=true",
 			want: &types.Command{
 				Verb:   types.VerbRead,
 				Target: types.Target{URL: "https://api.example.com/users"},
 				Clauses: []types.Clause{
-					types.InsecureClause{},
+					types.InsecureClause{Value: true},
 				},
 			},
 			wantErr: false,
 		},
 		{
 			name:  "read with timeout",
-			input: "read https://api.example.com/users timeout=5s",
+			input: "read https://api.example.com/users under=5s",
 			want: &types.Command{
 				Verb:   types.VerbRead,
 				Target: types.Target{URL: "https://api.example.com/users"},
 				Clauses: []types.Clause{
-					types.TimeoutClause{Duration: 5000000000}, // 5s in nanoseconds
+					types.UnderClause{Duration: 5000000000, IsSize: false}, // 5s in nanoseconds
 				},
 			},
 			wantErr: false,
@@ -224,6 +224,196 @@ func TestParseErrorSuggestions(t *testing.T) {
 			}
 			if parseErr.Suggest != tt.wantSuggestion {
 				t.Errorf("Parse() Suggest = %v, want %v", parseErr.Suggest, tt.wantSuggestion)
+			}
+		})
+	}
+}
+
+func TestParseQuotedStringsWithSemicolons(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		check   func(*testing.T, *types.Command)
+	}{
+		{
+			name:    "include with semicolon in header value",
+			input:   `read https://api.example.com/users include="header: Content-Type: application/json; charset=UTF-8"`,
+			wantErr: false,
+			check: func(t *testing.T, cmd *types.Command) {
+				if len(cmd.Clauses) != 1 {
+					t.Fatalf("expected 1 clause, got %d", len(cmd.Clauses))
+				}
+				includeClause, ok := cmd.Clauses[0].(types.IncludeClause)
+				if !ok {
+					t.Fatalf("expected IncludeClause, got %T", cmd.Clauses[0])
+				}
+				if len(includeClause.Items) != 1 {
+					t.Fatalf("expected 1 include item, got %d", len(includeClause.Items))
+				}
+				item := includeClause.Items[0]
+				if item.Type != "header" {
+					t.Errorf("expected header type, got %s", item.Type)
+				}
+				if item.Name != "Content-Type" {
+					t.Errorf("expected header name Content-Type, got %s", item.Name)
+				}
+				if item.Value != "application/json; charset=UTF-8" {
+					t.Errorf("expected header value 'application/json; charset=UTF-8', got %s", item.Value)
+				}
+			},
+		},
+		{
+			name:    "expect with semicolon in header value",
+			input:   `read https://api.example.com/users expect="status:200, header:Content-Type=application/json; charset=utf-8"`,
+			wantErr: false,
+			check: func(t *testing.T, cmd *types.Command) {
+				if len(cmd.Clauses) != 1 {
+					t.Fatalf("expected 1 clause, got %d", len(cmd.Clauses))
+				}
+				expectClause, ok := cmd.Clauses[0].(types.ExpectClause)
+				if !ok {
+					t.Fatalf("expected ExpectClause, got %T", cmd.Clauses[0])
+				}
+				if len(expectClause.Checks) != 2 {
+					t.Fatalf("expected 2 expect checks, got %d", len(expectClause.Checks))
+				}
+				headerCheck := expectClause.Checks[1]
+				if headerCheck.Type != "header" {
+					t.Errorf("expected header check type, got %s", headerCheck.Type)
+				}
+				if headerCheck.Name != "Content-Type" {
+					t.Errorf("expected header name Content-Type, got %s", headerCheck.Name)
+				}
+				if headerCheck.Value != "application/json; charset=utf-8" {
+					t.Errorf("expected header value 'application/json; charset=utf-8', got %s", headerCheck.Value)
+				}
+			},
+		},
+		{
+			name:    "multiple include items with semicolons",
+			input:   `read https://api.example.com/users include="header: Accept: application/json; q=0.9; param: q=test"`,
+			wantErr: false,
+			check: func(t *testing.T, cmd *types.Command) {
+				includeClause := cmd.Clauses[0].(types.IncludeClause)
+				if len(includeClause.Items) != 2 {
+					t.Fatalf("expected 2 include items, got %d", len(includeClause.Items))
+				}
+				headerItem := includeClause.Items[0]
+				if headerItem.Value != "application/json; q=0.9" {
+					t.Errorf("expected header value 'application/json; q=0.9', got %s", headerItem.Value)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, err := parser.Parse(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err == nil && tt.check != nil {
+				tt.check(t, cmd)
+			}
+		})
+	}
+}
+
+func TestParseBasicAuth(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		check   func(*testing.T, *types.Command)
+	}{
+		{
+			name:    "basic auth with username:password",
+			input:   `read https://httpbin.org/basic-auth/user/passwd include='basic: user:passwd'`,
+			wantErr: false,
+			check: func(t *testing.T, cmd *types.Command) {
+				if len(cmd.Clauses) != 1 {
+					t.Fatalf("expected 1 clause, got %d", len(cmd.Clauses))
+				}
+				includeClause, ok := cmd.Clauses[0].(types.IncludeClause)
+				if !ok {
+					t.Fatalf("expected IncludeClause, got %T", cmd.Clauses[0])
+				}
+				if len(includeClause.Items) != 1 {
+					t.Fatalf("expected 1 include item, got %d", len(includeClause.Items))
+				}
+				item := includeClause.Items[0]
+				if item.Type != "basic" {
+					t.Errorf("expected basic type, got %s", item.Type)
+				}
+				if item.Value != "user:passwd" {
+					t.Errorf("expected value 'user:passwd', got %s", item.Value)
+				}
+			},
+		},
+		{
+			name:    "basic auth with quoted credentials",
+			input:   `read https://httpbin.org/basic-auth/user/passwd include="basic: user:passwd"`,
+			wantErr: false,
+			check: func(t *testing.T, cmd *types.Command) {
+				includeClause := cmd.Clauses[0].(types.IncludeClause)
+				item := includeClause.Items[0]
+				if item.Type != "basic" {
+					t.Errorf("expected basic type, got %s", item.Type)
+				}
+				if item.Value != "user:passwd" {
+					t.Errorf("expected value 'user:passwd', got %s", item.Value)
+				}
+			},
+		},
+		{
+			name:    "basic auth combined with other include items",
+			input:   `read https://httpbin.org/basic-auth/user/passwd include='basic: user:passwd; header: Accept: application/json'`,
+			wantErr: false,
+			check: func(t *testing.T, cmd *types.Command) {
+				includeClause := cmd.Clauses[0].(types.IncludeClause)
+				if len(includeClause.Items) != 2 {
+					t.Fatalf("expected 2 include items, got %d", len(includeClause.Items))
+				}
+				basicItem := includeClause.Items[0]
+				if basicItem.Type != "basic" {
+					t.Errorf("expected first item to be basic, got %s", basicItem.Type)
+				}
+				headerItem := includeClause.Items[1]
+				if headerItem.Type != "header" {
+					t.Errorf("expected second item to be header, got %s", headerItem.Type)
+				}
+			},
+		},
+		{
+			name:    "basic auth missing colon",
+			input:   `read https://httpbin.org/basic-auth/user/passwd include='basic: userpass'`,
+			wantErr: true,
+		},
+		{
+			name:    "basic auth with empty username",
+			input:   `read https://httpbin.org/basic-auth/user/passwd include='basic: :passwd'`,
+			wantErr: false,
+			check: func(t *testing.T, cmd *types.Command) {
+				includeClause := cmd.Clauses[0].(types.IncludeClause)
+				item := includeClause.Items[0]
+				if item.Value != ":passwd" {
+					t.Errorf("expected value ':passwd', got %s", item.Value)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, err := parser.Parse(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err == nil && tt.check != nil {
+				tt.check(t, cmd)
 			}
 		})
 	}

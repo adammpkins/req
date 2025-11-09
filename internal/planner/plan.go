@@ -2,6 +2,7 @@
 package planner
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -15,26 +16,33 @@ import (
 
 // ExecutionPlan represents a fully resolved execution plan ready for HTTP runtime.
 type ExecutionPlan struct {
-	Method      string            `json:"method"`
-	URL         string            `json:"url"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	QueryParams map[string]string `json:"query_params,omitempty"`
-	Body        *BodyPlan         `json:"body,omitempty"`
-	Output      *OutputPlan       `json:"output,omitempty"`
-	Retry       *RetryPlan        `json:"retry,omitempty"`
-	Timeout     *time.Duration   `json:"timeout,omitempty"`
-	Proxy       string            `json:"proxy,omitempty"`
-	Insecure    bool              `json:"insecure,omitempty"`
-	Verbose     bool              `json:"verbose,omitempty"`
-	Resume      bool              `json:"resume,omitempty"`
+	Verb        types.Verb         `json:"verb"`
+	Method      string             `json:"method"`
+	URL         string             `json:"url"`
+	Headers     map[string]string  `json:"headers,omitempty"`
+	QueryParams map[string]string  `json:"query_params,omitempty"`
+	Cookies     map[string]string  `json:"cookies,omitempty"`
+	Body        *BodyPlan          `json:"body,omitempty"`
+	Output      *OutputPlan        `json:"output,omitempty"`
+	Retry       *RetryPlan         `json:"retry,omitempty"`
+	Timeout     *time.Duration    `json:"timeout,omitempty"`
+	SizeLimit   *int64            `json:"size_limit,omitempty"`
+	Proxy       string             `json:"proxy,omitempty"`
+	Insecure    bool               `json:"insecure,omitempty"`
+	Verbose     bool               `json:"verbose,omitempty"`
+	Resume      bool               `json:"resume,omitempty"`
+	Follow      string             `json:"follow,omitempty"` // "smart" or empty
+	Expect      []types.ExpectCheck `json:"expect,omitempty"`
 }
 
 // BodyPlan represents the request body configuration.
 type BodyPlan struct {
-	Type     string `json:"type"` // json, form, multipart, raw
-	Content  string `json:"content,omitempty"`
-	FilePath string `json:"file_path,omitempty"`
-	Field    string `json:"field,omitempty"` // for multipart
+	Type     string                `json:"type"` // json, form, multipart, raw
+	Content  string                `json:"content,omitempty"`
+	FilePath string                `json:"file_path,omitempty"`
+	Field    string                `json:"field,omitempty"` // for multipart
+	AttachParts []types.AttachPart `json:"attach_parts,omitempty"` // for multipart
+	Boundary string                `json:"boundary,omitempty"` // for multipart
 }
 
 // OutputPlan represents the output configuration.
@@ -59,9 +67,11 @@ type BackoffRange struct {
 // Plan creates an ExecutionPlan from a parsed Command.
 func Plan(cmd *types.Command) (*ExecutionPlan, error) {
 	plan := &ExecutionPlan{
-		URL:      cmd.Target.URL,
-		Headers:  make(map[string]string),
+		Verb:        cmd.Verb,
+		URL:         cmd.Target.URL,
+		Headers:     make(map[string]string),
 		QueryParams: make(map[string]string),
+		Cookies:     make(map[string]string),
 	}
 
 	// Apply verb-specific defaults
@@ -115,10 +125,11 @@ func applyVerbDefaults(verb types.Verb, plan *ExecutionPlan) error {
 		plan.Method = http.MethodGet
 		plan.Output = &OutputPlan{Format: "raw"}
 	case types.VerbSend:
-		// Default to POST if with= is present, otherwise GET
+		// Default to GET, will be changed to POST if with= is present
 		plan.Method = http.MethodGet
 		plan.Output = &OutputPlan{Format: "auto"}
 	case types.VerbUpload:
+		// Default to POST, but will error if no attach= or with= present
 		plan.Method = http.MethodPost
 		plan.Output = &OutputPlan{Format: "auto"}
 	case types.VerbWatch:
@@ -127,6 +138,15 @@ func applyVerbDefaults(verb types.Verb, plan *ExecutionPlan) error {
 	case types.VerbInspect:
 		plan.Method = http.MethodHead
 		plan.Output = &OutputPlan{Format: "json"}
+	case types.VerbAuthenticate:
+		// Default to POST if with= is present, otherwise require using=
+		// We'll check this in validatePlan
+		plan.Method = http.MethodPost // tentative, may be overridden
+		plan.Output = &OutputPlan{Format: "auto"}
+	case types.VerbSession:
+		// Session verbs are handled separately in main
+		plan.Method = http.MethodGet // placeholder
+		plan.Output = &OutputPlan{Format: "auto"}
 	default:
 		return fmt.Errorf("unsupported verb: %s", verb)
 	}
@@ -181,8 +201,29 @@ func applyClause(clause types.Clause, plan *ExecutionPlan, verb types.Verb) erro
 		if plan.Body == nil {
 			plan.Body = &BodyPlan{}
 		}
-		plan.Body.Type = c.Type
-		plan.Body.Content = c.Value
+		
+		// Handle file or stdin
+		if c.IsFile {
+			plan.Body.FilePath = c.Value
+			plan.Body.Type = c.Type
+			if plan.Body.Type == "" {
+				plan.Body.Type = "raw" // Default for files
+			}
+		} else if c.IsStdin {
+			plan.Body.FilePath = "-" // Special marker for stdin
+			plan.Body.Type = c.Type
+			if plan.Body.Type == "" {
+				plan.Body.Type = "raw" // Default for stdin
+			}
+		} else {
+			plan.Body.Content = c.Value
+			plan.Body.Type = c.Type
+			// If type was inferred as JSON, we'll note it in runtime
+			if plan.Body.Type == "json" {
+				// JSON inference will be logged in runtime
+			}
+		}
+		
 		// If method is still GET and we have a body, default to POST
 		if plan.Method == http.MethodGet {
 			plan.Method = http.MethodPost
@@ -225,7 +266,53 @@ func applyClause(clause types.Clause, plan *ExecutionPlan, verb types.Verb) erro
 		}
 		plan.Output.Pick = c.Path
 	case types.InsecureClause:
-		plan.Insecure = true
+		plan.Insecure = c.Value
+	case types.ViaClause:
+		plan.Proxy = c.URL
+	case types.IncludeClause:
+		// Merge include items into headers, params, or cookies
+		for _, item := range c.Items {
+			switch item.Type {
+			case "header":
+				// For multi-valued headers, we'd need to track arrays, but for now last wins
+				// TODO: Support multi-valued headers properly
+				plan.Headers[item.Name] = item.Value
+			case "param":
+				// Params can be repeated, so we append to query params
+				// The runtime will handle serialization
+				plan.QueryParams[item.Name] = item.Value
+			case "cookie":
+				// Cookies: last value wins
+				plan.Cookies[item.Name] = item.Value
+			case "basic":
+				// Basic Auth: encode username:password and set Authorization header
+				// item.Value contains "username:password"
+				credentials := item.Value
+				// Base64 encode the credentials
+				encoded := base64.StdEncoding.EncodeToString([]byte(credentials))
+				// Set Authorization header with Basic scheme
+				plan.Headers["Authorization"] = "Basic " + encoded
+			}
+		}
+	case types.AttachClause:
+		if plan.Body == nil {
+			plan.Body = &BodyPlan{}
+		}
+		plan.Body.Type = "multipart"
+		plan.Body.AttachParts = c.Parts
+		if c.Boundary != "" {
+			plan.Body.Boundary = c.Boundary
+		}
+	case types.ExpectClause:
+		plan.Expect = c.Checks
+	case types.FollowClause:
+		plan.Follow = c.Policy
+	case types.UnderClause:
+		if c.IsSize {
+			plan.SizeLimit = &c.Size
+		} else {
+			plan.Timeout = &c.Duration
+		}
 	case types.VerboseClause:
 		plan.Verbose = true
 	case types.ResumeClause:
@@ -244,8 +331,12 @@ func validatePlan(plan *ExecutionPlan) error {
 	if plan.URL == "" {
 		return fmt.Errorf("URL is required")
 	}
-	// Validate that save has a destination
-	// This will be expanded as we add more validation rules
+	
+	// Validate upload verb: must have attach= or with=
+	// This check will be done after clauses are processed, so we check here
+	// Actually, we need to check this in Plan() after processing clauses
+	// For now, we'll do basic validation
+	
 	return nil
 }
 

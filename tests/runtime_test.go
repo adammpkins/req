@@ -263,7 +263,7 @@ func TestRuntimeSaveVideoFile(t *testing.T) {
 // TestRuntimeReadWithTimeout tests request with timeout.
 // Note: This test requires internet connectivity.
 func TestRuntimeReadWithTimeout(t *testing.T) {
-	cmdStr := "read https://httpbin.org/json timeout=10s"
+	cmdStr := "read https://httpbin.org/json under=10s"
 	
 	cmd, err := parser.Parse(cmdStr)
 	if err != nil {
@@ -371,5 +371,69 @@ func TestRuntimeInvalidURL(t *testing.T) {
 	}
 
 	t.Logf("Successfully handled invalid URL error: %v", err)
+}
+
+// TestRuntimeBasicAuth tests Basic Auth with httpbin.org/basic-auth endpoint.
+// Note: This test requires internet connectivity.
+func TestRuntimeBasicAuth(t *testing.T) {
+	cmdStr := `read https://httpbin.org/basic-auth/user/passwd include='basic: user:passwd' expect=status:200`
+	
+	cmd, err := parser.Parse(cmdStr)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	plan, err := planner.Plan(cmd)
+	if err != nil {
+		t.Fatalf("Plan() error = %v", err)
+	}
+
+	// Verify that Authorization header was set correctly
+	authHeader, ok := plan.Headers["Authorization"]
+	if !ok {
+		t.Fatal("Authorization header not set in plan")
+	}
+	if !strings.HasPrefix(authHeader, "Basic ") {
+		t.Errorf("Authorization header should start with 'Basic ', got: %s", authHeader)
+	}
+
+	executor, err := runtime.NewExecutor(plan)
+	if err != nil {
+		t.Fatalf("NewExecutor() error = %v", err)
+	}
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err = executor.Execute(plan)
+	
+	// Close write end and restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	// Read output
+	output, _ := io.ReadAll(r)
+	
+	// Verify we got a successful response
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("Failed to parse JSON response: %v", err)
+	}
+	
+	authenticated, ok := result["authenticated"].(bool)
+	if !ok || !authenticated {
+		t.Errorf("Expected authenticated=true, got: %v", result["authenticated"])
+	}
+	
+	user, ok := result["user"].(string)
+	if !ok || user != "user" {
+		t.Errorf("Expected user='user', got: %v", result["user"])
+	}
 }
 

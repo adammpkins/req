@@ -5,6 +5,8 @@ BINARY_NAME=req
 MAIN_PATH=./cmd/req
 VERSION?=dev
 BUILD_DIR=./bin
+COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -15,8 +17,13 @@ help: ## Show this help message
 build: ## Build the req binary
 	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	@go build -trimpath -ldflags="-s -w -X main.version=$(VERSION)" -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+ifeq ($(GOOS),windows)
+	@go build -trimpath -ldflags="-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildDate=$(DATE)" -o $(BUILD_DIR)/$(BINARY_NAME).exe $(MAIN_PATH)
+	@echo "Binary built: $(BUILD_DIR)/$(BINARY_NAME).exe"
+else
+	@go build -trimpath -ldflags="-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildDate=$(DATE)" -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
 	@echo "Binary built: $(BUILD_DIR)/$(BINARY_NAME)"
+endif
 
 test: ## Run tests with race detector
 	@echo "Running tests..."

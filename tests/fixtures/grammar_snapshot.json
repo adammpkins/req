@@ -1,0 +1,75 @@
+{
+  "verbs": [
+    "read",
+    "save",
+    "send",
+    "upload",
+    "watch",
+    "inspect",
+    "authenticate",
+    "session"
+  ],
+  "clauses": [
+    {
+      "name": "using=",
+      "description": "HTTP method override",
+      "repeatable": false
+    },
+    {
+      "name": "include=",
+      "description": "Add headers, params, cookies",
+      "repeatable": true
+    },
+    {
+      "name": "with=",
+      "description": "Request body",
+      "repeatable": false
+    },
+    {
+      "name": "expect=",
+      "description": "Assertions on response",
+      "repeatable": false
+    },
+    {
+      "name": "as=",
+      "description": "Output format for stdout",
+      "repeatable": false
+    },
+    {
+      "name": "to=",
+      "description": "Destination path",
+      "repeatable": false
+    },
+    {
+      "name": "retry=",
+      "description": "Retry attempts for transient errors",
+      "repeatable": false
+    },
+    {
+      "name": "under=",
+      "description": "Timeout or size limit",
+      "repeatable": false
+    },
+    {
+      "name": "via=",
+      "description": "Proxy URL",
+      "repeatable": false
+    },
+    {
+      "name": "attach=",
+      "description": "Multipart parts for upload or send",
+      "repeatable": true
+    },
+    {
+      "name": "follow=",
+      "description": "Redirect policy for write verbs",
+      "repeatable": false
+    },
+    {
+      "name": "insecure=",
+      "description": "Disable TLS verification for this request",
+      "repeatable": false
+    }
+  ]
+}
+
