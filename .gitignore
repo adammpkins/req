@@ -1,33 +1,111 @@
-# Binaries
+# Binaries and executables
 bin/
 req
 req.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
 # Test binary, built with `go test -c`
 *.test
 
 # Output of the go coverage tool
 *.out
+coverage.txt
+coverage.html
 
 # Dependency directories
 vendor/
 
 # Go workspace file
 go.work
+go.work.sum
 
-# IDE
+# Go build cache
+.cache/
+
+# IDE and editor files
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
 
-# OS
+# OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
 # Build artifacts
 dist/
+build/
 *.tar.gz
 *.zip
+*.deb
+*.rpm
 
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+*.bak
+*.backup
+
+# Session files (contain sensitive data)
+.config/req/session_*.json
+~/.config/req/session_*.json
+
+# Test fixtures and outputs
+testdata/*.json
+testdata/*.txt
+!testdata/.gitkeep
+*.golden
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Output files
+output.txt
+*.output
+
+# Debug files
+debug
+*.debug
+
+# Profiling data
+*.prof
+*.pprof
+
+# Air (live reload tool)
+tmp/
+
+# Local configuration
+.local/
+
+# Cursor/Composer specific (keep rules but ignore other files)
+.cursor/
+!.cursor/rules/
+!.cursor/plan.md
+
+# Documentation build outputs
+docs/_build/
+docs/.doctrees/
+
+# Generated files
+*.generated.go
+*_gen.go
