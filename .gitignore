@@ -1,6 +1,6 @@
 # Binaries and executables
 bin/
-req
+/req
 req.exe
 *.exe
 *.exe~
